@@ -1,0 +1,42 @@
+body{
+    margin: 0;
+    padding: 0;
+    background-color: black;
+    align-items: center;
+    justify-content: center;
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+#zoneJeu{
+    background-color: white;
+    width: 120vmin;
+    height: 85vmin;
+    background-image: url("./assets/Swords_Bravery.png");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+#btnPlay{
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0,0;
+    font-size: 50px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    color: rgb(218,206,147);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-shadow: 2px 2px 5px black;
+}
+
+#btnPlay:hover{
+    color: white;
+    animation: ease-in-out 0.5s glowing;
+    transform: translate(-50%, -50%) scale(1.1);
+}
