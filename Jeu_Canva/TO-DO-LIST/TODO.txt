@@ -1,0 +1,53 @@
+Étape 1 Structurer le projet et avoir un affichage:
+- Créer un background en css pour le moment avec un event listener sans boucle de jeu avec des draw en js
+- Créer des éléments supperposés qui se révèle au fur a mesure des écrans
+
+Étape 2 Restructurer le projet :
+- Tout doit être dessiné en ctx.drawImage(), ctx en général
+- supprimer les éléments html supperposés
+- html ne contient que canvas et script pour la création des objets...
+
+Étape 3 Boucle d'animation :
+- Créer la fonction GameLoop appelant RequestAnimationFrame() pour respecter les bonnes pratiques
+- a chaque frame des pommes appeler update() et draw() | render() 
+- Calculer le temps de trajet des objets 
+
+* Ne pas utiliser setInterval(), setTimeout() 
+
+Étape 4 Gestion des états du jeu :
+- Définir MENU,CHOIX , COMBAT, DEFENSE, ARCHERIE
+- selon les état dessiner les bons écrans 
+- Logique selon les états
+- Les transitions sont faites grâces aux eventListener dans la classe ecouteurs_centralise
+
+Étape 5 Dessins des écrans :
+- Dessiner l'img du menu + txt PLAY + zone cliquable en canvas
+- Dessins des 3 carrés
+- barre de progression avec les combos
+
+Étape 6 POO :
+- Créer la classe Entity (pos,vitesse,taille) avec les méthodes update() draw() | render()
+- Projectile extends Entity
+- classe index ou Game qui orchestre le Tout
+- Gestion des écouteurs dans ecouteurs_centralise
+
+Étape 7 Trasnformation Géométrique :
+- Dessiner tous les objets comme s'il étaient en 0,0
+- ctx.translate(x,y) pour positionner les projectiles
+- ctx.rotate(angle) pour gérer la d'où provienne les projectiles
+- chaque dessin est encadrer par ctx.save() et ctx.restore()
+
+Étape 8 écouteurs à utiliser :
+- écouteurs sur click,mousemove,keydown et keyup
+- stocker l'état des touches dans keys = {}
+- stocker la position de la souris mouse = {x,y,clicked}
+
+Étape 9 gameplay a faire :
+- Combat les 4 flèches directionnelles qui doivent soit taper les pommes soit les étoiles
+- Défense déplacement de la souris lié au bouclier pour arrêter les pommes et laisser entrer les étoiles
+- Archerie a voir
+
+Étape 10 Documentation :
+- Rédiger le README avec la Description du JEU, comment lancer le projet, la structure des fichiers
+- assets utilisés et utilisation de l'IA pour quelles parties quels prompts utilisés...
+- Respect des bonnes pratiques avec des commentaires
