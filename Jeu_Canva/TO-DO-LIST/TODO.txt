@@ -51,3 +51,12 @@
 - Rédiger le README avec la Description du JEU, comment lancer le projet, la structure des fichiers
 - assets utilisés et utilisation de l'IA pour quelles parties quels prompts utilisés...
 - Respect des bonnes pratiques avec des commentaires
+
+
+
+
+
+
+
+
+Étape 1 Complete

@@ -3,37 +3,65 @@ import { choixJeu, casesChoix, zoneJeu } from "./ecouteurs_centralise.js";
 const canvas = document.getElementById("zoneJeu");
 const ctx = canvas.getContext("2d");
 
+canvas.width = clientWidth*ctx;
+canvas.height = clientHeight*ctx;
+
 const imgMenu = new Image();
 imgMenu.src = "assets/Swords_Bravery.png";
 
-const imgPersonnage = new Image();
-imgPersonnage.src = "assets/Personnage.png";
+imgMenu.onload = startLoopAllLoaded();
+
+
+const fond = new Image();
+fond.src = "assets/Fond.png";
+
+fond.onload = startLoopAllLoaded();
 
 let gameState = "MENU";
 
-choixJeu.forEach((carre) => {
-    carre.addEventListener("click", () => {
-        const choixId = carre.id;
-        console.log("Choix sélectionné :", choixId);
+function update(x) {
+}
 
-        // Cache tous les carrés
-        casesChoix.classList.remove("visible");
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (gameState === "MENU") {
+        drawMenu();
+    }
+    if (gameState === "JEU") {
+        ctx.drawImage(fond, 0, 0, canvas.width, canvas.height);
+    }
+}
 
-        // Logique selon le choix
-        if (choixId === "choix1") {
-            gameState = "COMBAT";
-            console.log("Lancement du mini-jeu Combat");
-        }
-        if (choixId === "choix2") {
-            gameState = "DEFENSE";
-            console.log("Lancement du mini-jeu Défense");
-        }
-        if (choixId === "choix3") {
-            gameState = "ARCHERIE";
-            console.log("Lancement du mini-jeu Archerie");
-        }
-    });
-});
+function loop(y) {
+    const dt = t-last;
+    update(dt);
+    draw();
+    last = t;
+    requestAnimationFrame(loop);
+}
+
+function drawMenu(){
+    ctx.drawImage(imgMenu, 0, 0, canvas.width, canvas.height);
+    playBtn={x,y,w,h}
+    ctx.fillRect(playBtn.x, playBtn.y, playBtn.w, playBtn.h);
+    ctx.strokeRect(playBtn.x, playBtn.y, playBtn.w, playBtn.h);
+    ctx.fillText("- PLAY -", playBtn.x+20, playBtn.y+30);
+}
 
 
+canvas.addEventListener("click", (e) => {});
+
+canvas.addEventListener("mousemove", (e) => {});
+
+getBoundingClientRect(
+    canvas.width,
+    rect.height
+)
+
+if (gameState === "MENU" && isInside(mx,my,playBtn)) { gameState='CHOIX'; currentBackground = imgBackgroundJeu; }
+
+
+
+
+   
 
