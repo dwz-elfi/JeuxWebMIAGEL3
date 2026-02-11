@@ -43,18 +43,25 @@ function isInside(pos, btn) {
 
 canvas.addEventListener("click", (e) => {
     const rect = canvas.getBoundingClientRect();
-    const mousePos = {
-        x: (e.clientX - rect.left-13),
-        y: (e.clientY - rect.top+14)
-    };
-    if (gameState === "MENU" && isInside(mousePos, playBtn)) {
+    const pos = { x: e.clientX - rect.left-13, y: e.clientY - rect.top+14 };
+    const pos2 = { x: e.clientX - rect.left-50, y: e.clientY+2 - rect.top };
+    if (gameState === "MENU" && isInside(pos, playBtn)) {
         gameState = "CHOIX";
         return;
     }
     if (gameState === "CHOIX" ) {
         choix.forEach(item => {
-            if (isInside(mousePos, item)) {
+            if (isInside(pos2, item)) {
                 console.log("Choix : " + item.label);
+                if (item.label === "Combat") {
+                    gameState = "COMBAT";
+                }
+                if (item.label === "Defense") {
+                    gameState = "DEFENSE";
+                }
+                if (item.label === "Archerie") {
+                    gameState = "ARCHERIE";
+                }
             }
         });
     }
@@ -69,7 +76,7 @@ canvas.addEventListener("click", (e) => {
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     const pos = { x: e.clientX - rect.left-13, y: e.clientY - rect.top+14 };
-    const pos2 = { x: e.clientX-48 - rect.left, y: e.clientY+2 - rect.top };
+    const pos2 = { x: e.clientX - rect.left-50, y: e.clientY+2 - rect.top };
     hoveredItem = null;
     if (gameState === 'MENU' && isInside(pos, playBtn)) hoveredItem = pos;
     if (gameState === 'CHOIX'){
@@ -112,9 +119,26 @@ function drawChoix() {
     ctx.restore();
 }
 
+
+function drawCombat() {
+    ctx.save();
+    drawMenu();
+    ctx.restore();
+}
+
+function drawDefense() {
+    ctx.save();
+    drawChoix();
+    ctx.restore();
+}
+
+function drawArcherie() {
+    ctx.save();
+    drawMenu();
+    ctx.restore();
+}
+
 function draw() {
-    // clear logical canvas area
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
 
     if (gameState === "MENU") {
@@ -123,6 +147,15 @@ function draw() {
     if (gameState === "CHOIX") {
         drawChoix(); 
     } 
+    if (gameState === "COMBAT") {
+        drawCombat();
+    }
+    if (gameState === "DEFENSE") {
+        drawDefense();
+    }
+    if (gameState === "ARCHERIE") {
+        drawArcherie();
+    }
     ctx.restore();
 }
 
