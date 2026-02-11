@@ -9,9 +9,3 @@ body{
     width: 100vw;
 }
 
-#zoneJeu{
-    background-image: url("./assets/Swords_Bravery.png");
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-}
