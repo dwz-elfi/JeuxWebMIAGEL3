@@ -1,6 +1,7 @@
 import Player from "./player.js";
 import { defineListeners, inputStates } from "./ecouteurs_centralise.js";
 import { circRectsOverlap } from "./collision.js";
+import { SlashAnimation, SlashSound } from "./animation.js";
 
 const canvas = document.getElementById("zoneJeu");
 const ctx = canvas.getContext("2d");
@@ -23,6 +24,19 @@ star.src = "assets/star.png";
 
 const pomme = new Image();
 pomme.src = "assets/Pomme.png";
+
+// Gestion des étoiles (stars)
+let stars = [];
+let lastStarTime = Date.now();
+let nextStarInterval = Math.random() * (3000 - 2000) + 2000; // 2-7 secondes
+
+// Cooldown de l'épée
+let lastAttackTime = 0;
+const attackCooldown = 250  ; // Durée d'affichage de l'épée en millisecondes
+
+// Animations et sons
+let slashAnimations = [];
+let slashSound = new SlashSound("assets/slash.mp3");
 
 //Etat du jeu de base
 let gameState = "MENU";
@@ -80,6 +94,16 @@ function drawCombat() {
     ctx.drawImage(fond, 0, 0, canvas.width, canvas.height);
     ctx.save();
     drawPlayer();
+    updateStars();
+    
+    // Dessiner et mettre à jour les animations de slash
+    for (let i = slashAnimations.length - 1; i >= 0; i--) {
+        slashAnimations[i].draw(ctx, canvas);
+        if (slashAnimations[i].isFinished) {
+            slashAnimations.splice(i, 1);
+        }
+    }
+    
     ctx.restore();
 }
 
@@ -99,6 +123,46 @@ function drawArcherie() {
 
 function drawPlayer() {
     player.draw(ctx);
+}
+
+function updateStars() {
+    let now = Date.now();
+    
+    // Créer une nouvelle étoile si l'intervalle est écoulé
+    if (now - lastStarTime > nextStarInterval) {
+        let newStar = {
+            x: 55,
+            y: -30,
+            width: 30,
+            height: 30,
+            speed: Math.random() * 4 + 1 // Vitesse aléatoire 1-3 px/frame
+        };
+        stars.push(newStar);
+        lastStarTime = now;
+        nextStarInterval = Math.random() * (7000 - 2000) + 2000; // Nouvel intervalle aléatoire
+    }
+    
+    // Mettre à jour et dessiner les étoiles
+    for (let i = stars.length - 1; i >= 0; i--) {
+        let s = stars[i];
+        s.y += s.speed; // Faire tomber l'étoile
+        
+        // Dessiner l'étoile
+        ctx.drawImage(star, s.x, s.y, s.width, s.height);
+        
+        // Vérifier collision avec l'épée du côté gauche seulement
+        if (inputStates.left) {
+            if (circRectsOverlap(80, 360, 10, 70, s.x + s.width/2, s.y + s.height/2, 15)) {
+                stars.splice(i, 1);
+                continue;
+            }
+        }
+        
+        // Supprimer les étoiles qui sortent du bas
+        if (s.y > canvas.height) {
+            stars.splice(i, 1);
+        }
+    }
 }
 
 canvas.addEventListener("click", (e) => {
@@ -157,49 +221,76 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 function attaqueJoueur() {
+    let now = Date.now();
+    
+    // Vérifier si le cooldown est écoulé
+    if (now - lastAttackTime < attackCooldown) {
+        return; // Pas encore le moment d'attaquer
+    }
+    
+    let attackExecuted = false;
+    
     if (inputStates.left) {
+        slashAnimations.push(new SlashAnimation(85, 395, Math.PI / 2));
+        
         ctx.save();
         ctx.translate(105, 395); // Centre de l'épée
         ctx.rotate(Math.PI / 2);
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 35, 350, 100, 90);
-        ctx.fillStyle = "red";ctx.fillRect(80, 360, 10, 70);
+        //ctx.fillStyle = "red";
+        ctx.fillRect(80, 360, 10, 70);
         ctx.restore();
+        attackExecuted = true;
     }
-       
-    if (inputStates.right) {
+    else if (inputStates.right) {
+        slashAnimations.push(new SlashAnimation(125, 530, -Math.PI / 2));
+        
         ctx.save();
         ctx.translate(105, 395); // Centre de l'épée
         ctx.rotate(-Math.PI / 2);
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 75, 488, 100, 85);
-        ctx.fillStyle = "red";
+        //ctx.fillStyle = "red";
         ctx.fillRect(120, 495, 10, 70);
         ctx.restore();
+        attackExecuted = true;
     }
-    if (inputStates.up) {
+    else if (inputStates.up) {
+        slashAnimations.push(new SlashAnimation(150, 252, 120*Math.PI / 90));
+        
         ctx.save();
         ctx.translate(105, 395); // Centre de l'épée
         ctx.rotate(120*Math.PI / 90);
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 65, 510, 100, 85);
-        ctx.fillStyle = "red";
+        //ctx.fillStyle = "red";
         ctx.fillRect(110, 515, 10, 70);
         ctx.restore();
+        attackExecuted = true;
     }
-    if (inputStates.down) {
+    else if (inputStates.down) {
+        slashAnimations.push(new SlashAnimation(135, 532, -Math.PI / 3));
+        
         ctx.save();
         ctx.translate(105, 395); // Centre de l'épée
         ctx.rotate(-Math.PI / 3);
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 85, 490, 100, 85);
-        ctx.fillStyle = "red";
+        //ctx.fillStyle = "red";
         ctx.fillRect(130, 495, 10, 70);
         ctx.restore();
+        attackExecuted = true;
+    }
+    
+    // Mettre à jour le cooldown et jouer le son si une attaque a été exécutée
+    if (attackExecuted) {
+        lastAttackTime = now;
+        slashSound.play();
     }
 }
 
