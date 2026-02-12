@@ -1,5 +1,6 @@
 import Player from "./player.js";
 import { defineListeners, inputStates } from "./ecouteurs_centralise.js";
+import { circRectsOverlap } from "./collision.js";
 
 const canvas = document.getElementById("zoneJeu");
 const ctx = canvas.getContext("2d");
@@ -13,6 +14,15 @@ const imgMenu = new Image();
 imgMenu.src = "assets/Swords_Bravery.png";
 const fond = new Image();
 fond.src = "assets/fond_jeu.png";
+
+const epee = new Image();
+epee.src = "assets/epee.png";
+
+const star = new Image();
+star.src = "assets/star.png";
+
+const pomme = new Image();
+pomme.src = "assets/Pomme.png";
 
 //Etat du jeu de base
 let gameState = "MENU";
@@ -148,17 +158,48 @@ canvas.addEventListener('mousemove', (e) => {
 
 function attaqueJoueur() {
     if (inputStates.left) {
-       ctx.beginPath();
-       ctx.rect();
-    }
-    if (inputStates.right) {
+        ctx.save();
+        ctx.translate(105, 395); // Centre de l'épée
+        ctx.rotate(Math.PI / 2);
+        ctx.translate(-105, -395); // Revenir à la position d'origine
         
+        ctx.drawImage(epee, 35, 350, 100, 90);
+        ctx.fillStyle = "red";ctx.fillRect(80, 360, 10, 70);
+        ctx.restore();
+    }
+       
+    if (inputStates.right) {
+        ctx.save();
+        ctx.translate(105, 395); // Centre de l'épée
+        ctx.rotate(-Math.PI / 2);
+        ctx.translate(-105, -395); // Revenir à la position d'origine
+        
+        ctx.drawImage(epee, 75, 488, 100, 85);
+        ctx.fillStyle = "red";
+        ctx.fillRect(120, 495, 10, 70);
+        ctx.restore();
     }
     if (inputStates.up) {
+        ctx.save();
+        ctx.translate(105, 395); // Centre de l'épée
+        ctx.rotate(120*Math.PI / 90);
+        ctx.translate(-105, -395); // Revenir à la position d'origine
         
+        ctx.drawImage(epee, 65, 510, 100, 85);
+        ctx.fillStyle = "red";
+        ctx.fillRect(110, 515, 10, 70);
+        ctx.restore();
     }
     if (inputStates.down) {
+        ctx.save();
+        ctx.translate(105, 395); // Centre de l'épée
+        ctx.rotate(-Math.PI / 3);
+        ctx.translate(-105, -395); // Revenir à la position d'origine
         
+        ctx.drawImage(epee, 85, 490, 100, 85);
+        ctx.fillStyle = "red";
+        ctx.fillRect(130, 495, 10, 70);
+        ctx.restore();
     }
 }
 
