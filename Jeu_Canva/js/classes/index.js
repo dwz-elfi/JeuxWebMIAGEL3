@@ -231,7 +231,7 @@ function attaqueJoueur() {
     let attackExecuted = false;
     
     if (inputStates.left) {
-        slashAnimations.push(new SlashAnimation(85, 395, Math.PI / 2));
+        slashAnimations.push(new SlashAnimation(80, 350, -Math.PI / 10));
         
         ctx.save();
         ctx.translate(105, 395); // Centre de l'épée
@@ -245,7 +245,7 @@ function attaqueJoueur() {
         attackExecuted = true;
     }
     else if (inputStates.right) {
-        slashAnimations.push(new SlashAnimation(125, 530, -Math.PI / 2));
+        slashAnimations.push(new SlashAnimation(180, 380, 60*Math.PI / 30));
         
         ctx.save();
         ctx.translate(105, 395); // Centre de l'épée
