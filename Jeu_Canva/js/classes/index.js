@@ -1,5 +1,5 @@
 import Player from "./player.js";
-import { defineListeners, inputStates } from "./ecouteurs.js";
+import { defineListeners, inputStates } from "./ecouteurs_centralise.js";
 
 const canvas = document.getElementById("zoneJeu");
 const ctx = canvas.getContext("2d");
@@ -148,7 +148,8 @@ canvas.addEventListener('mousemove', (e) => {
 
 function attaqueJoueur() {
     if (inputStates.left) {
-       ctx.beginPath(); 
+       ctx.beginPath();
+       ctx.rect();
     }
     if (inputStates.right) {
         
@@ -160,6 +161,7 @@ function attaqueJoueur() {
         
     }
 }
+
 
 function Gameloop() {
     // 1 - on efface le canvas

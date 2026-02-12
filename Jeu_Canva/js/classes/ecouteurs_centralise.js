@@ -1,7 +1,8 @@
+
 let inputStates = {};
 
 function defineListeners() {
-    console.log("Définition des écouteurs d'événements");
+    //console.log("Définition des écouteurs d'événements");
     // Ecouteurs pour le clavier
     document.onkeydown = (event) => {
         console.log("Touche appuyée : " + event.key);
