@@ -30,6 +30,18 @@ let stars = [];
 let lastStarTime = Date.now();
 let nextStarInterval = Math.random() * (3000 - 2000) + 2000; // 2-7 secondes
 
+let pommes = [];
+let lastPomme = Date.now();
+let nextPomme = Math.random()*(3000-2000);
+
+let pommesHaut = [];
+let lastPommeHaut = Date.now();
+let nextPommeHaut = Math.random()*(3000-2000);
+
+let pommesBas = [];
+let lastPommeBas = Date.now();
+let nextPommeBas = Math.random()*(3000-2000);
+
 // Cooldown de l'épée
 let lastAttackTime = 0;
 const attackCooldown = 250  ; // Durée d'affichage de l'épée en millisecondes
@@ -95,6 +107,9 @@ function drawCombat() {
     ctx.save();
     drawPlayer();
     updateStars();
+    updatePommes();
+    updatePommesHaut();
+    updatePommesBas();
     
     // Dessiner et mettre à jour les animations de slash
     for (let i = slashAnimations.length - 1; i >= 0; i--) {
@@ -164,6 +179,144 @@ function updateStars() {
         }
     }
 }
+
+function updatePommes(){
+    let now = Date.now();
+    
+    // Créer une nouvelle pomme si l'intervalle est écoulé
+    if (now - lastPomme > nextPomme) {
+        let speed = Math.random() * 4 + 1;
+        let newPomme = {
+            x: 850, // Arrive par la droite
+            y: 350, // Position y fixe
+            width: 30,
+            height: 30,
+            vx: -speed, // Vecteur x (vers la gauche)
+            vy: 0 // Vecteur y (pas de mouvement vertical)
+        };
+        pommes.push(newPomme);
+        lastPomme = now;
+        nextPomme = Math.random() * (3000 - 2000) + 2000; // Nouvel intervalle aléatoire
+    }
+    
+    // Mettre à jour et dessiner les pommes
+    for (let i = pommes.length - 1; i >= 0; i--) {
+        let p = pommes[i];
+        p.x += p.vx;
+        p.y += p.vy; 
+        
+        // Dessiner la pomme
+        ctx.drawImage(pomme, p.x, p.y, p.width, p.height);
+        
+        // Vérifier collision avec l'épée du côté droit
+        if (inputStates.right) {
+            if (circRectsOverlap(250, 350, 10, 70, p.x + p.width/2+10, p.y + p.height/2, 15)) {
+                pommes.splice(i, 1);
+                continue;
+            }
+        }
+
+        // Supprimer les pommes qui sortent du canvas par la gauche
+        if (p.x+240 < player.x) {
+            player.color = "red";
+            console.log("Touché par une pomme venant du Millieu")
+            pommes.splice(i, 1);
+        }
+    }
+}
+
+function updatePommesHaut(){
+    let now = Date.now();
+    
+    // Créer une nouvelle pomme du haut si l'intervalle est écoulé
+    if (now - lastPommeHaut > nextPommeHaut) {
+        let speed = Math.random() * 4 + 1;
+        let newPomme = {
+            x: 850, // Arrive par la droite
+            y: 250, // Position y pour l'attaque du haut
+            width: 30,
+            height: 30,
+            vx: -speed, // Vecteur x (vers la gauche)
+            vy: speed * 0.06 // Vecteur y (descend vers le bas)
+        };
+        pommesHaut.push(newPomme);
+        lastPommeHaut = now;
+        nextPommeHaut = Math.random() * (3000 - 2000) + 2000; // Nouvel intervalle aléatoire
+    }
+    
+    // Mettre à jour et dessiner les pommes du haut
+    for (let i = pommesHaut.length - 1; i >= 0; i--) {
+        let p = pommesHaut[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        
+        // Dessiner la pomme
+        ctx.drawImage(pomme, p.x, p.y, p.width, p.height);
+        
+        // Collision avec l'épée du côté haut
+        if (inputStates.up) {
+            if (circRectsOverlap(110, 250, 10, 70, p.x + p.width/2, p.y + p.height/2+500, 500)) {
+                console.log("Pomme Haut touchew")
+                pommesHaut.splice(i, 1);
+
+                continue;
+            }
+        }
+        // Supprimer les pommes qui sortent du canvas par la gauche
+        if (p.x+250 < player.x) {
+            player.color = "yellow";
+            console.log("Touché par une pomme venant du Haut")
+            pommesHaut.splice(i, 1);
+        }
+    }
+}
+
+function updatePommesBas(){
+    let now = Date.now();
+    
+    // Créer une nouvelle pomme du bas si l'intervalle est écoulé
+    if (now - lastPommeBas > nextPommeBas) {
+        let speed = Math.random() * 4 + 1;
+        let newPomme = {
+            x: 850, // Arrive par la droite
+            y: 450, // Position y pour l'attaque du bas
+            width: 30,
+            height: 30,
+            vx: -speed, // Vecteur x (vers la gauche)
+            vy: -speed * 0.06 // Vecteur y (monte vers le haut)
+        };
+        pommesBas.push(newPomme);
+        lastPommeBas = now;
+        nextPommeBas = Math.random() * (3000 - 2000) + 2000; // Nouvel intervalle aléatoire
+    }
+    
+    // Mettre à jour et dessiner les pommes du bas
+    for (let i = pommesBas.length - 1; i >= 0; i--) {
+        let p = pommesBas[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        
+        // Dessiner la pomme
+        ctx.drawImage(pomme, p.x, p.y, p.width, p.height);
+        
+        // Collision avec l'épée du côté bas
+        if (inputStates.down) {
+            if (circRectsOverlap(250, 450, 10, 70, p.x + p.width/2+500, p.y + p.height/2, 500)) {
+                console.log("Pomme Bas touchew")
+                pommesBas.splice(i, 1);
+                continue;
+            }
+        }
+        
+        // Supprimer les pommes qui sortent du canvas par la gauche
+        if (p.x+250 < player.x) {
+            player.color = "green";
+            console.log("Touché par une pomme venant du Bas")
+            pommesBas.splice(i, 1);
+        }
+    }
+}
+
 
 canvas.addEventListener("click", (e) => {
     const rect = canvas.getBoundingClientRect();

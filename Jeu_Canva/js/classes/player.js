@@ -4,6 +4,7 @@ import ObjetGraphique from "./objetGraphique.js";
 export default class Player extends ObjetGraphique {
     constructor(x, y, largeur, hauteur) {
         super(x, y, largeur, hauteur);
+        this.color = "blue";
     }
 
     draw(ctx) {
@@ -26,7 +27,7 @@ export default class Player extends ObjetGraphique {
 
         ctx.roundRect(this.x-275, this.y+25, this.largeur, this.largeur*1.5,this.largeur / 2);
 
-        ctx.fillStyle = "blue";
+        ctx.fillStyle = this.color;
 
         ctx.fill(); //dessine en forme plein tout le contenu du buffer de la
                     // carte graphique. beginPath remet à zero ce buffer.
