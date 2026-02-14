@@ -26,6 +26,9 @@ star.src = "assets/star.png";
 const pommeIMG = new Image();
 pommeIMG.src = "assets/Pomme.png";
 
+const btnBack = new Image();
+btnBack.src = "assets/fleche_retour.png";
+
 // Gestion des étoiles (stars)
 let stars = [];
 let lastStarTime = Date.now();
@@ -126,7 +129,7 @@ function drawBackButton() {
     ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
     ctx.font = "30px Arial";
     // Dessin d'une flèche simple "←"
-    ctx.fillText("←", backBtn.x, backBtn.y + 30);
+    ctx.drawImage(btnBack, backBtn.x, backBtn.y, backBtn.w, backBtn.h);
     ctx.restore();
 }
 
@@ -342,6 +345,7 @@ canvas.addEventListener("click", (e) => {
     const rect = canvas.getBoundingClientRect();
     const pos = { x: e.clientX - rect.left-13, y: e.clientY - rect.top+14 };
     const pos2 = { x: e.clientX - rect.left-50, y: e.clientY+2 - rect.top };
+    const back = {x: 10, y: 35, w: 45, h: 35 }
     if (gameState === "MENU" && isInside(pos, playBtn)) {
         console.log("bouton play cliqué");
         gameState = "CHOIX";
@@ -362,6 +366,11 @@ canvas.addEventListener("click", (e) => {
                 }
             }
         });
+        return;
+    }
+    if ((gameState === "COMBAT" || gameState === "DEFENSE" || gameState === "ARCHERIE") && isInside(pos, back)) {
+        console.log("Retour au choix");
+        gameState = "CHOIX";
     }
     if(hoveredItem) {
         canvas.style.cursor = "pointer";
@@ -375,6 +384,7 @@ canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     const pos = { x: e.clientX - rect.left-13, y: e.clientY - rect.top+14 };
     const pos2 = { x: e.clientX - rect.left-50, y: e.clientY+2 - rect.top };
+    const backBtnHover = {x: 10, y: 35, w: 45, h: 35 }
     hoveredItem = null;
     if (gameState === 'MENU' && isInside(pos, playBtn)) {
         hoveredItem = pos;
@@ -385,6 +395,9 @@ canvas.addEventListener('mousemove', (e) => {
                 hoveredItem = item; 
             }
         });
+    }
+    else if ((gameState === "COMBAT" || gameState === "DEFENSE" || gameState === "ARCHERIE") && isInside(pos, backBtnHover)) {
+        hoveredItem = backBtn;
     }
     if(hoveredItem) {
         canvas.style.cursor = "pointer";
