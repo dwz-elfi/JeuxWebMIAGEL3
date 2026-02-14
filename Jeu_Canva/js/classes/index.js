@@ -2,6 +2,7 @@ import Player from "./player.js";
 import { defineListeners, inputStates } from "./ecouteurs_centralise.js";
 import { circRectsOverlap } from "./collision.js";
 import { SlashAnimation, SlashSound } from "./animation.js";
+import { pomme, Star } from "./entity.js";
 
 const canvas = document.getElementById("zoneJeu");
 const ctx = canvas.getContext("2d");
@@ -22,25 +23,35 @@ epee.src = "assets/epee.png";
 const star = new Image();
 star.src = "assets/star.png";
 
-const pomme = new Image();
-pomme.src = "assets/Pomme.png";
+const pommeIMG = new Image();
+pommeIMG.src = "assets/Pomme.png";
 
 // Gestion des étoiles (stars)
 let stars = [];
 let lastStarTime = Date.now();
 let nextStarInterval = Math.random() * (3000 - 2000) + 2000; // 2-7 secondes
 
+// Gestion des pommes (pommes)
 let pommes = [];
-let lastPomme = Date.now();
-let nextPomme = Math.random()*(3000-2000);
+let lastpomme = Date.now();
+let nextpomme = Math.random() * (3000 - 2000) + 2000;
 
-let pommesHaut = [];
-let lastPommeHaut = Date.now();
-let nextPommeHaut = Math.random()*(3000-2000);
+// Système de difficulté
+let difficulty = 1; // Multiplicateur de difficulté (commence à 1)
+const DIFFICULTY_INCREASE = 0.1; // Augmentation par pomme frappée
+const MIN_APPLE_SPAWN = 800; // Intervalle minimum de spawn des pommes
+const MIN_STAR_SPAWN = 800; // Intervalle minimum de spawn des étoiles
 
-let pommesBas = [];
-let lastPommeBas = Date.now();
-let nextPommeBas = Math.random()*(3000-2000);
+// Système de score et combo
+let score = 0;
+let combo = 0;
+let lastScore = 0;
+
+let scores = {
+    COMBAT: localStorage.getItem('highscore_COMBAT') ? parseInt(localStorage.getItem('highscore_COMBAT')) : 0,
+    DEFENSE: localStorage.getItem('highscore_DEFENSE') ? parseInt(localStorage.getItem('highscore_DEFENSE')) : 0,
+    ARCHERIE: localStorage.getItem('highscore_ARCHERIE') ? parseInt(localStorage.getItem('highscore_ARCHERIE')) : 0
+};
 
 // Cooldown de l'épée
 let lastAttackTime = 0;
@@ -87,29 +98,44 @@ function drawChoix() {
     ctx.save();
     
     ctx.textAlign = "center";
-    ctx.font = "20px sans-serif";
-
     choix.forEach(item => {
-        // Dessin du rectangle
+        // Rectangle
         ctx.fillStyle = item.color;
-        ctx.fillRect(item.x+50, item.y, item.w, item.h);
+        ctx.fillRect(item.x + 50, item.y, item.w, item.h);
         
-        // Dessin du texte
+        // Texte Label
         ctx.fillStyle = "white";
+        ctx.font = "20px sans-serif";
         ctx.fillText(item.label, item.x + item.w/2 + 50, item.y + item.h/2 + 10);
+
+        // Affichage du HighScore spécifique sous chaque bouton
+        ctx.font = "14px sans-serif";
+        let key = item.label.toUpperCase();
+        ctx.fillText("Record: " + scores[key], item.x + item.w/2 + 50, item.y + item.h + 20);
     });
+    
     ctx.restore();
 }
 
+
+// Taille et position du bouton retour
+const backBtn = { x: 20, y: 20, w: 50, h: 40 };
+
+function drawBackButton() {
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.font = "30px Arial";
+    // Dessin d'une flèche simple "←"
+    ctx.fillText("←", backBtn.x, backBtn.y + 30);
+    ctx.restore();
+}
 
 function drawCombat() {
     ctx.drawImage(fond, 0, 0, canvas.width, canvas.height);
     ctx.save();
     drawPlayer();
     updateStars();
-    updatePommes();
-    updatePommesHaut();
-    updatePommesBas();
+    updatepommes();
     
     // Dessiner et mettre à jour les animations de slash
     for (let i = slashAnimations.length - 1; i >= 0; i--) {
@@ -118,6 +144,9 @@ function drawCombat() {
             slashAnimations.splice(i, 1);
         }
     }
+    
+    // Afficher le score et combo
+    drawScoreAndCombo();
     
     ctx.restore();
 }
@@ -140,6 +169,23 @@ function drawPlayer() {
     player.draw(ctx);
 }
 
+function drawScoreAndCombo() {
+    ctx.save();
+    ctx.fillStyle = "white";
+    ctx.font = "bold 20px sans-serif";
+    
+    // Score actuel et Combo au centre
+    ctx.textAlign = "center";
+    ctx.fillText("COMBO: " + combo, canvas.width / 2, 30);
+    ctx.fillText("SCORE: " + score, canvas.width / 2, 55);
+    
+    // Last Score à droite
+    ctx.textAlign = "right";
+    ctx.fillText("LAST: " + lastScore, canvas.width - 20, 35);
+    
+    ctx.restore();
+}
+
 function updateStars() {
     let now = Date.now();
     
@@ -154,7 +200,9 @@ function updateStars() {
         };
         stars.push(newStar);
         lastStarTime = now;
-        nextStarInterval = Math.random() * (7000 - 2000) + 2000; // Nouvel intervalle aléatoire
+        // Intervalle réduit selon la difficulté
+        let baseInterval = Math.random() * (4500 - 2500) + 2500; // 2.5-4.5 secondes (moins d'étoiles)
+        nextStarInterval = Math.max(MIN_STAR_SPAWN, baseInterval / difficulty-1); // Réduit par la difficulté
     }
     
     // Mettre à jour et dessiner les étoiles
@@ -168,6 +216,9 @@ function updateStars() {
         // Vérifier collision avec l'épée du côté gauche seulement
         if (inputStates.left) {
             if (circRectsOverlap(80, 360, 10, 70, s.x + s.width/2, s.y + s.height/2, 15)) {
+                // Augmenter le score et combo pour les étoiles
+                score += 20;
+                combo += 2;
                 stars.splice(i, 1);
                 continue;
             }
@@ -180,139 +231,108 @@ function updateStars() {
     }
 }
 
-function updatePommes(){
+function updatepommes() {
     let now = Date.now();
     
     // Créer une nouvelle pomme si l'intervalle est écoulé
-    if (now - lastPomme > nextPomme) {
-        let speed = Math.random() * 4 + 1;
-        let newPomme = {
-            x: 850, // Arrive par la droite
-            y: 350, // Position y fixe
-            width: 30,
-            height: 30,
-            vx: -speed, // Vecteur x (vers la gauche)
-            vy: 0 // Vecteur y (pas de mouvement vertical)
-        };
-        pommes.push(newPomme);
-        lastPomme = now;
-        nextPomme = Math.random() * (3000 - 2000) + 2000; // Nouvel intervalle aléatoire
+    if (now - lastpomme > nextpomme) {
+        // La vitesse augmente avec la difficulté
+        let baseSpeed = Math.random() * 1+1.5; // 0.5-1.5 (bien plus lent au début)
+        let speed = baseSpeed * difficulty;
+        let pommeType = Math.floor(Math.random() * 3); // 0: milieu, 1: haut, 2: bas
+        let y, vy, playerColorOnHit, hitMessage;
+        
+        // Déterminer les paramètres selon le type de pomme
+        if (pommeType === 1) { // Pomme du haut
+            y = 250;
+            vy = speed * 0.06;
+            playerColorOnHit = "yellow";
+            hitMessage = "Touché par une pomme venant du Haut";
+        } else if (pommeType === 0) { // Pomme du milieu
+            y = 350;
+            vy = 0;
+            playerColorOnHit = "red";
+            hitMessage = "Touché par une pomme venant du Milieu";
+        } else { // Pomme du bas
+            y = 450;
+            vy = -speed * 0.06;
+            playerColorOnHit = "green";
+            hitMessage = "Touché par une pomme venant du Bas";
+        }
+        
+        let newpomme = new pomme(850, y, 30, 30, -speed, vy);
+        newpomme.type = pommeType;
+        newpomme.playerColorOnHit = playerColorOnHit;
+        newpomme.hitMessage = hitMessage;
+        
+        pommes.push(newpomme);
+        lastpomme = now;
+        // Intervalle de spawn réduit selon la difficulté (pour plus de pommes)
+        let baseInterval = Math.random() * (1500 - 700) + 700; // 0.7-1.2 secondes (plus de pommes)
+        nextpomme = Math.max(MIN_APPLE_SPAWN, baseInterval / difficulty); // Réduit par la difficulté
     }
     
     // Mettre à jour et dessiner les pommes
     for (let i = pommes.length - 1; i >= 0; i--) {
-        let p = pommes[i];
-        p.x += p.vx;
-        p.y += p.vy; 
-        
-        // Dessiner la pomme
-        ctx.drawImage(pomme, p.x, p.y, p.width, p.height);
-        
-        // Vérifier collision avec l'épée du côté droit
-        if (inputStates.right) {
-            if (circRectsOverlap(250, 350, 10, 70, p.x + p.width/2+10, p.y + p.height/2, 15)) {
+        let p = pommes[i]; // On utilise 'p' pour éviter la confusion avec le tableau 'pommes'
+        p.update(); 
+        p.draw(ctx, pommeIMG);
+
+        // Vérifier collision avec l'épée selon le type de pomme
+        if (p.type === 0 && inputStates.right) { // Pomme du milieu
+            if (circRectsOverlap(250, 350, 55, 70, p.x + p.largeur/2+25 , p.y + p.hauteur/2, 15)) {
+                console.log("Pomme MID touchée! Difficulté: " + difficulty.toFixed(2));
                 pommes.splice(i, 1);
+                // Augmenter la difficulté, score et combo
+                difficulty += DIFFICULTY_INCREASE;
+                score += 10;
+                combo += 1;
+                
+                continue;
+            }
+        } 
+        else if (p.type === 1 && inputStates.up) { // Pomme du haut
+            if (circRectsOverlap(110, 250, 20, 70, p.x + p.largeur/2, p.y + p.hauteur/2 + 500, 500)) {
+                console.log("Pomme Haut touchée! Difficulté: " + difficulty.toFixed(2));
+                pommes.splice(i, 1);
+                // Augmenter la difficulté, score et combo
+                difficulty += DIFFICULTY_INCREASE;
+                score += 10;
+                combo += 1;
+                continue;
+            }
+        } 
+        else if (p.type === 2 && inputStates.down) { // Pomme du bas
+            if (circRectsOverlap(250, 440, 20, 70, p.x + p.largeur/2 + 500, p.y + p.hauteur/2, 500)) {
+                pommes.splice(i, 1);
+                console.log("Pomme Bas touchée! Difficulté: " + difficulty.toFixed(2));
+                // Augmenter la difficulté, score et combo
+                difficulty += DIFFICULTY_INCREASE;
+                score += 10;
+                combo += 1;
                 continue;
             }
         }
 
-        // Supprimer les pommes qui sortent du canvas par la gauche
-        if (p.x+240 < player.x) {
-            player.color = "red";
-            console.log("Touché par une pomme venant du Millieu")
+        // Pomme qui sort de l'écran ou touche le joueur
+        if (p.x + 250 < player.x) {
+            player.color = p.playerColorOnHit;
+            console.log(p.hitMessage);
+            console.log("Difficulté réinitialisée à 1");
+            
+            // Sauvegarder le score et reset
+            lastScore = score;
+            if (score > scores[gameState]) {
+                scores[gameState] = score;
+                localStorage.setItem('highscore_' + gameState, score);
+                console.log("Nouveau record en " + gameState + ": " + score);
+            }
+            
+            // Réinitialiser la difficulté et le score
+            difficulty = 1;
+            score = 0;
+            combo = 0;
             pommes.splice(i, 1);
-        }
-    }
-}
-
-function updatePommesHaut(){
-    let now = Date.now();
-    
-    // Créer une nouvelle pomme du haut si l'intervalle est écoulé
-    if (now - lastPommeHaut > nextPommeHaut) {
-        let speed = Math.random() * 4 + 1;
-        let newPomme = {
-            x: 850, // Arrive par la droite
-            y: 250, // Position y pour l'attaque du haut
-            width: 30,
-            height: 30,
-            vx: -speed, // Vecteur x (vers la gauche)
-            vy: speed * 0.06 // Vecteur y (descend vers le bas)
-        };
-        pommesHaut.push(newPomme);
-        lastPommeHaut = now;
-        nextPommeHaut = Math.random() * (3000 - 2000) + 2000; // Nouvel intervalle aléatoire
-    }
-    
-    // Mettre à jour et dessiner les pommes du haut
-    for (let i = pommesHaut.length - 1; i >= 0; i--) {
-        let p = pommesHaut[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        
-        // Dessiner la pomme
-        ctx.drawImage(pomme, p.x, p.y, p.width, p.height);
-        
-        // Collision avec l'épée du côté haut
-        if (inputStates.up) {
-            if (circRectsOverlap(110, 250, 10, 70, p.x + p.width/2, p.y + p.height/2+500, 500)) {
-                console.log("Pomme Haut touchew")
-                pommesHaut.splice(i, 1);
-
-                continue;
-            }
-        }
-        // Supprimer les pommes qui sortent du canvas par la gauche
-        if (p.x+250 < player.x) {
-            player.color = "yellow";
-            console.log("Touché par une pomme venant du Haut")
-            pommesHaut.splice(i, 1);
-        }
-    }
-}
-
-function updatePommesBas(){
-    let now = Date.now();
-    
-    // Créer une nouvelle pomme du bas si l'intervalle est écoulé
-    if (now - lastPommeBas > nextPommeBas) {
-        let speed = Math.random() * 4 + 1;
-        let newPomme = {
-            x: 850, // Arrive par la droite
-            y: 450, // Position y pour l'attaque du bas
-            width: 30,
-            height: 30,
-            vx: -speed, // Vecteur x (vers la gauche)
-            vy: -speed * 0.06 // Vecteur y (monte vers le haut)
-        };
-        pommesBas.push(newPomme);
-        lastPommeBas = now;
-        nextPommeBas = Math.random() * (3000 - 2000) + 2000; // Nouvel intervalle aléatoire
-    }
-    
-    // Mettre à jour et dessiner les pommes du bas
-    for (let i = pommesBas.length - 1; i >= 0; i--) {
-        let p = pommesBas[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        
-        // Dessiner la pomme
-        ctx.drawImage(pomme, p.x, p.y, p.width, p.height);
-        
-        // Collision avec l'épée du côté bas
-        if (inputStates.down) {
-            if (circRectsOverlap(250, 450, 10, 70, p.x + p.width/2+500, p.y + p.height/2, 500)) {
-                console.log("Pomme Bas touchew")
-                pommesBas.splice(i, 1);
-                continue;
-            }
-        }
-        
-        // Supprimer les pommes qui sortent du canvas par la gauche
-        if (p.x+250 < player.x) {
-            player.color = "green";
-            console.log("Touché par une pomme venant du Bas")
-            pommesBas.splice(i, 1);
         }
     }
 }
@@ -392,7 +412,7 @@ function attaqueJoueur() {
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 35, 350, 100, 90);
-        //ctx.fillStyle = "red";
+        ctx.fillStyle = "red";
         ctx.fillRect(80, 360, 10, 70);
         ctx.restore();
         attackExecuted = true;
@@ -406,7 +426,7 @@ function attaqueJoueur() {
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 75, 488, 100, 85);
-        //ctx.fillStyle = "red";
+        ctx.fillStyle = "red";
         ctx.fillRect(120, 495, 10, 70);
         ctx.restore();
         attackExecuted = true;
@@ -420,7 +440,7 @@ function attaqueJoueur() {
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 65, 510, 100, 85);
-        //ctx.fillStyle = "red";
+        ctx.fillStyle = "red";
         ctx.fillRect(110, 515, 10, 70);
         ctx.restore();
         attackExecuted = true;
@@ -434,7 +454,7 @@ function attaqueJoueur() {
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 85, 490, 100, 85);
-        //ctx.fillStyle = "red";
+        ctx.fillStyle = "red";
         ctx.fillRect(130, 495, 10, 70);
         ctx.restore();
         attackExecuted = true;
@@ -460,10 +480,13 @@ function Gameloop() {
     } else if (gameState === "COMBAT") {
         drawCombat();
         attaqueJoueur();
+        drawBackButton()
     } else if (gameState === "DEFENSE") {
         drawDefense();
+        drawBackButton()
     } else if (gameState === "ARCHERIE") {
         drawArcherie();
+        drawBackButton()
     }
 
     defineListeners();
