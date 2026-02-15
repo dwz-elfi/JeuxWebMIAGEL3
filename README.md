@@ -51,7 +51,7 @@ La logique est répartie entre classes métier, index.js pilote seulement les é
 - Les états dans le jeu sont : MENU, CHOIX, COMBAT, DEFENSE, ARCHERIE selon l'état la GameLoop appelle les bons dessins (drawMenu() ...)
 - Chaque mode à sa propre logiques avec des timers différents des difficultés différentes
 
-## 4. Ce dont je suis fièr
+## 4. Ce dont je suis fier
 
 - Trois modes de jeu avec des mécaniques différentes tout en réutilisant les mêmes assets et la même structure
 - Architecture propre avec la séparation de tout comme il faut
