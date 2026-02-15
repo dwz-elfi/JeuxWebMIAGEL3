@@ -1,7 +1,14 @@
+/**
+ * Écouteurs centralisés : ne fait qu'enregistrer les événements (clavier, clic, souris)
+ * et exposer les données. La logique du jeu reste dans index.js.
+ */
 
 let inputStates = {};
 
-/** Position de la souris dans les coordonnées du canvas (pour le bouclier en mode Défense). */
+/** Dernier clic (coordonnées client), consommé par le jeu à chaque frame. */
+let pendingClick = null;
+
+/** Position de la souris en coordonnées canvas (mise à jour à chaque mousemove). */
 let mousePosition = { x: 0, y: 0 };
 
 function defineListeners() {
@@ -42,85 +49,34 @@ function defineListeners() {
 }
 
 /**
- * Initialise les écouteurs sur le canvas (clic, mouvement de souris).
- * À appeler une seule fois au démarrage avec le contexte du jeu.
- * @param {Object} gameContext - { canvas, getGameState, setGameState, playBtn, choix, backBtn, isInside, getHoveredItem, setHoveredItem }
+ * Initialise les écouteurs sur le canvas (clic, mouvement).
+ * Ne reçoit que l'élément canvas : enregistre les événements et met à jour
+ * pendingClick et mousePosition. La logique (menu, curseur) est gérée dans index.js.
+ * @param {HTMLCanvasElement} canvas
  */
-function initCanvasListeners(gameContext) {
-    const canvas = gameContext.canvas;
+function initCanvasListeners(canvas) {
     if (!canvas) return;
 
     canvas.addEventListener("click", (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const pos = { x: e.clientX - rect.left - 13, y: e.clientY - rect.top + 14 };
-        const pos2 = { x: e.clientX - rect.left - 50, y: e.clientY + 2 - rect.top };
-        const back = { x: 10, y: 35, w: 45, h: 35 };
-
-        if (gameContext.getGameState() === "MENU" && gameContext.isInside(pos, gameContext.playBtn)) {
-            gameContext.setGameState("CHOIX");
-            return;
-        }
-        if (gameContext.getGameState() === "CHOIX") {
-            gameContext.choix.forEach((item) => {
-                if (gameContext.isInside(pos2, item)) {
-                    if (item.label === "Combat") gameContext.setGameState("COMBAT");
-                    if (item.label === "Defense") gameContext.setGameState("DEFENSE");
-                    if (item.label === "Archerie") gameContext.setGameState("ARCHERIE");
-                }
-            });
-            return;
-        }
-        if (
-            (gameContext.getGameState() === "COMBAT" ||
-                gameContext.getGameState() === "DEFENSE" ||
-                gameContext.getGameState() === "ARCHERIE") &&
-            gameContext.isInside(pos, back)
-        ) {
-            gameContext.setGameState("CHOIX");
-        }
-
-        if (gameContext.getHoveredItem()) {
-            canvas.style.cursor = "pointer";
-        } else {
-            canvas.style.cursor = "default";
-        }
+        pendingClick = { clientX: e.clientX, clientY: e.clientY };
     });
 
     canvas.addEventListener("mousemove", (e) => {
         const rect = canvas.getBoundingClientRect();
-        const pos = { x: e.clientX - rect.left - 13, y: e.clientY - rect.top + 14 };
-        const pos2 = { x: e.clientX - rect.left - 50, y: e.clientY + 2 - rect.top };
-        const backBtnHover = { x: 10, y: 35, w: 45, h: 35 };
-
-        // Toujours mettre à jour la position souris (pour le bouclier en mode Défense)
         mousePosition.x = e.clientX - rect.left;
         mousePosition.y = e.clientY - rect.top;
-
-        gameContext.setHoveredItem(null);
-        if (gameContext.getGameState() === "MENU" && gameContext.isInside(pos, gameContext.playBtn)) {
-            gameContext.setHoveredItem(pos);
-        }
-        if (gameContext.getGameState() === "CHOIX") {
-            gameContext.choix.forEach((item) => {
-                if (gameContext.isInside(pos2, item)) {
-                    gameContext.setHoveredItem(item);
-                }
-            });
-        } else if (
-            (gameContext.getGameState() === "COMBAT" ||
-                gameContext.getGameState() === "DEFENSE" ||
-                gameContext.getGameState() === "ARCHERIE") &&
-            gameContext.isInside(pos, backBtnHover)
-        ) {
-            gameContext.setHoveredItem(gameContext.backBtn);
-        }
-
-        if (gameContext.getHoveredItem()) {
-            canvas.style.cursor = "pointer";
-        } else {
-            canvas.style.cursor = "default";
-        }
     });
 }
 
-export { defineListeners, inputStates, initCanvasListeners, mousePosition };
+/**
+ * Récupère le dernier clic (coordonnées client) et le retire.
+ * À appeler dans la game loop pour traiter le clic une seule fois.
+ * @returns {{ clientX: number, clientY: number } | null}
+ */
+function getAndConsumeClick() {
+    const click = pendingClick;
+    pendingClick = null;
+    return click;
+}
+
+export { defineListeners, inputStates, initCanvasListeners, mousePosition, getAndConsumeClick };

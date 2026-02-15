@@ -1,5 +1,5 @@
 import Player from "./player.js";
-import { defineListeners, inputStates, initCanvasListeners, mousePosition } from "./ecouteurs_centralise.js";
+import { defineListeners, inputStates, initCanvasListeners, mousePosition, getAndConsumeClick } from "./ecouteurs_centralise.js";
 import { circRectsOverlap } from "./collision.js";
 import { SlashAnimation, SlashSound } from "./animation.js";
 import { pomme, Star } from "./entity.js";
@@ -125,23 +125,69 @@ const backBtn = { x: 20, y: 20, w: 50, h: 40 };
 
 // Défense : centre du joueur et géométrie du bouclier (contrôlé par la souris)
 const DEFENSE_PLAYER_CX = 425;
-const DEFENSE_PLAYER_CY = 325;
-const SHIELD_RADIUS = 90;
-const SHIELD_HALF_ANGLE = (100 * Math.PI) / 180; // 100° d'ouverture en radians
+const DEFENSE_PLAYER_CY = 350;
+const SHIELD_RADIUS = 60;
+const SHIELD_HALF_ANGLE = (35 * Math.PI) / 180;
 
-// Contexte passé aux écouteurs centralisés (clic, souris) — initialisé après choix et backBtn
-const gameContext = {
-    get canvas() { return canvas; },
-    getGameState: () => gameState,
-    setGameState: (s) => { gameState = s; },
-    playBtn,
-    choix,
-    backBtn,
-    isInside,
-    getHoveredItem: () => hoveredItem,
-    setHoveredItem: (item) => { hoveredItem = item; }
-};
-initCanvasListeners(gameContext);
+// Défense uniquement : listes et timers (pommes/étoiles de toutes directions)
+let defensePommes = [];
+let defenseStars = [];
+let lastDefensePommeTime = 0;
+let nextDefensePommeInterval = 1100; // une pomme au plus toutes les ~1,1 s (pas 2 au même moment)
+let lastDefenseStarTime = 0;
+let nextDefenseStarInterval = 3200;  // étoiles moins souvent que les pommes
+const DEFENSE_POMME_SPEED = 1.8;
+const DEFENSE_STAR_SPEED = 1.2;
+const DEFENSE_MARGIN = 50;
+
+initCanvasListeners(canvas);
+
+/** Traite un éventuel clic (menu, choix de jeu, retour) et met à jour le curseur. */
+function processInput() {
+    const rect = canvas.getBoundingClientRect();
+    const back = { x: 10, y: 35, w: 45, h: 35 };
+
+    const click = getAndConsumeClick();
+    if (click) {
+        const pos = { x: click.clientX - rect.left - 13, y: click.clientY - rect.top + 14 };
+        const pos2 = { x: click.clientX - rect.left - 50, y: click.clientY + 2 - rect.top };
+        if (gameState === "MENU" && isInside(pos, playBtn)) {
+            gameState = "CHOIX";
+            return;
+        }
+        if (gameState === "CHOIX") {
+            choix.forEach((item) => {
+                if (isInside(pos2, item)) {
+                    if (item.label === "Combat") gameState = "COMBAT";
+                    if (item.label === "Defense") {
+                        gameState = "DEFENSE";
+                        defensePommes = [];
+                        defenseStars = [];
+                    }
+                    if (item.label === "Archerie") gameState = "ARCHERIE";
+                }
+            });
+            return;
+        }
+        if ((gameState === "COMBAT" || gameState === "DEFENSE" || gameState === "ARCHERIE") && isInside(pos, back)) {
+            gameState = "CHOIX";
+        }
+    }
+
+    const pos = { x: mousePosition.x - 13, y: mousePosition.y + 14 };
+    const pos2 = { x: mousePosition.x - 50, y: mousePosition.y + 2 };
+    hoveredItem = null;
+    if (gameState === "MENU" && isInside(pos, playBtn)) hoveredItem = pos;
+    if (gameState === "CHOIX") {
+        choix.forEach((item) => {
+            if (isInside(pos2, item)) hoveredItem = item;
+        });
+    }
+    if ((gameState === "COMBAT" || gameState === "DEFENSE" || gameState === "ARCHERIE") && isInside(pos, back)) {
+        hoveredItem = backBtn;
+    }
+    canvas.style.cursor = hoveredItem ? "pointer" : "default";
+}
 
 function drawBackButton() {
     ctx.save();
@@ -210,13 +256,176 @@ function drawShield() {
     ctx.restore();
 }
 
+/**
+ * Spawn une pomme depuis un bord aléatoire, se dirigeant vers le joueur.
+ * Une seule pomme par intervalle (pas deux au même endroit / même moment).
+ */
+function spawnDefensePomme() {
+    const side = Math.floor(Math.random() * 4);
+    let x, y;
+    if (side === 0) {
+        x = DEFENSE_MARGIN + Math.random() * (canvas.width - 2 * DEFENSE_MARGIN);
+        y = -DEFENSE_MARGIN;
+    } else if (side === 1) {
+        x = canvas.width + DEFENSE_MARGIN;
+        y = DEFENSE_MARGIN + Math.random() * (canvas.height - 2 * DEFENSE_MARGIN);
+    } else if (side === 2) {
+        x = DEFENSE_MARGIN + Math.random() * (canvas.width - 2 * DEFENSE_MARGIN);
+        y = canvas.height + DEFENSE_MARGIN;
+    } else {
+        x = -DEFENSE_MARGIN;
+        y = DEFENSE_MARGIN + Math.random() * (canvas.height - 2 * DEFENSE_MARGIN);
+    }
+    const dx = DEFENSE_PLAYER_CX - x;
+    const dy = DEFENSE_PLAYER_CY - y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    
+    // MODIFICATION ICI : On multiplie par 'difficulty' pour accélérer les pommes
+    const speed = (DEFENSE_POMME_SPEED * (0.8 + Math.random() * 0.4)) * difficulty;
+    
+    const vx = (dx / dist) * speed;
+    const vy = (dy / dist) * speed;
+    const p = new pomme(x, y, 30, 30, vx, vy);
+    p.playerColorOnHit = "red";
+    defensePommes.push(p);
+}
+
+/**
+ * Spawn une étoile depuis un bord aléatoire (moins souvent que les pommes).
+ */
+function spawnDefenseStar() {
+    const side = Math.floor(Math.random() * 4);
+    let x, y;
+    if (side === 0) {
+        x = DEFENSE_MARGIN + Math.random() * (canvas.width - 2 * DEFENSE_MARGIN);
+        y = -DEFENSE_MARGIN;
+    } else if (side === 1) {
+        x = canvas.width + DEFENSE_MARGIN;
+        y = DEFENSE_MARGIN + Math.random() * (canvas.height - 2 * DEFENSE_MARGIN);
+    } else if (side === 2) {
+        x = DEFENSE_MARGIN + Math.random() * (canvas.width - 2 * DEFENSE_MARGIN);
+        y = canvas.height + DEFENSE_MARGIN;
+    } else {
+        x = -DEFENSE_MARGIN;
+        y = DEFENSE_MARGIN + Math.random() * (canvas.height - 2 * DEFENSE_MARGIN);
+    }
+    const dx = DEFENSE_PLAYER_CX - x;
+    const dy = DEFENSE_PLAYER_CY - y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const speed = DEFENSE_STAR_SPEED * (0.7 + Math.random() * 0.5);
+    const vx = (dx / dist) * speed;
+    const vy = (dy / dist) * speed;
+    defenseStars.push({
+        x, y, width: 30, height: 30, vx, vy,
+        update() { this.x += this.vx; this.y += this.vy; }
+    });
+}
+
+/**
+ * Logique complète du mode Défense : spawn pommes/étoiles de toutes directions,
+ * étoiles moins souvent, une pomme à la fois (pas 2 au même moment), collisions bouclier/joueur.
+ */
+function updateDefense() {
+    const now = Date.now();
+
+    // --- GESTION DU SPAWN (Pommes) ---
+    if (now - lastDefensePommeTime >= nextDefensePommeInterval) {
+        spawnDefensePomme();
+        lastDefensePommeTime = now;
+        // La fréquence augmente avec la difficulté
+        nextDefensePommeInterval = (900 + Math.random() * 500) / difficulty;
+        if(nextDefensePommeInterval < 200) nextDefensePommeInterval = 200;
+    }
+    
+    // --- GESTION DU SPAWN (Étoiles) ---
+    if (now - lastDefenseStarTime >= nextDefenseStarInterval) {
+        spawnDefenseStar();
+        lastDefenseStarTime = now;
+        nextDefenseStarInterval = 2800 + Math.random() * 1200;
+    }
+
+    // --- BOUCLE DES ÉTOILES ---
+    for (let i = defenseStars.length - 1; i >= 0; i--) {
+        const s = defenseStars[i];
+        s.update();
+        ctx.drawImage(star, s.x, s.y, s.width, s.height);
+
+        // Calcul du centre de l'étoile
+        const cx = s.x + s.width / 2;
+        const cy = s.y + s.height / 2;
+
+        // 1. COLLISION BOUCLIER (NOUVEAU)
+        // Si l'étoile tape le bouclier, elle disparaît SANS donner de points
+        if (isPointInShieldArc(cx, cy)) {
+            defenseStars.splice(i, 1);
+            continue; // On arrête là pour cette étoile
+        }
+
+        // 2. COLLISION CORPS DU JOUEUR (BONUS)
+        // Si l'étoile touche le joueur (cercle central), on gagne des points
+        const distStarPlayer = Math.sqrt((cx - DEFENSE_PLAYER_CX) ** 2 + (cy - DEFENSE_PLAYER_CY) ** 2);
+        
+        if (distStarPlayer < 35) {
+            score += 20;   
+            combo += 2;    
+            defenseStars.splice(i, 1); 
+            continue;     
+        }
+
+        // Suppression si hors écran
+        if (s.x + s.width < -20 || s.x > canvas.width + 20 || s.y + s.height < -20 || s.y > canvas.height + 20) {
+            defenseStars.splice(i, 1);
+        }
+    }
+
+    // --- BOUCLE DES POMMES ---
+    for (let i = defensePommes.length - 1; i >= 0; i--) {
+        const p = defensePommes[i];
+        p.update();
+        p.draw(ctx, pommeIMG);
+
+        const cx = p.x + p.largeur / 2;
+        const cy = p.y + p.hauteur / 2;
+        
+        // 1. COLLISION BOUCLIER (PARADE REUSSIE)
+        if (isPointInShieldArc(cx, cy)) {
+            defensePommes.splice(i, 1);
+            difficulty += DIFFICULTY_INCREASE; // Ça accélère le jeu
+            score += 10;
+            combo += 1;
+            continue;
+        }
+        
+        // 2. COLLISION JOUEUR (DÉFAITE / RESET)
+        const distToPlayer = Math.sqrt((cx - DEFENSE_PLAYER_CX) ** 2 + (cy - DEFENSE_PLAYER_CY) ** 2);
+        
+        if (distToPlayer < 35) {
+            player.color = p.playerColorOnHit;
+            lastScore = score;
+            
+            if (score > scores.DEFENSE) {
+                scores.DEFENSE = score;
+                localStorage.setItem("highscore_DEFENSE", score);
+            }
+            
+            // Reset de la difficulté et du score
+            difficulty = 1;
+            score = 0;
+            combo = 0;
+            
+            defensePommes.splice(i, 1);
+        } else if (p.x + p.largeur < -30 || p.x > canvas.width + 30 || p.y + p.hauteur < -30 || p.y > canvas.height + 30) {
+            defensePommes.splice(i, 1);
+        }
+    }
+}
+
 function drawDefense() {
     ctx.drawImage(fond, 0, 0, canvas.width, canvas.height);
     ctx.save();
     drawPlayer();
     drawShield();
-    updateStars();
-    updatepommes();
+    updateDefense();
     drawScoreAndCombo();
     ctx.restore();
 }
@@ -511,6 +720,8 @@ function attaqueJoueur() {
 function Gameloop() {
     // 1 - on efface le canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    processInput();
+    defineListeners();
 
     // 2 - on dessine tous les objets du jeu en fonction de l'état du jeu
     if (gameState === "MENU") {
@@ -528,8 +739,6 @@ function Gameloop() {
         drawArcherie();
         drawBackButton()
     }
-
-    defineListeners();
 
     requestAnimationFrame(Gameloop);
 }
