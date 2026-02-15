@@ -56,6 +56,22 @@ let scores = {
     ARCHERIE: localStorage.getItem('highscore_ARCHERIE') ? parseInt(localStorage.getItem('highscore_ARCHERIE')) : 0
 };
 
+// --- VARIABLES ARCHERIE (uniquement pour le mode Archerie) ---
+let arrows = [];
+const ARROW_SPEED = 11;
+let lastShotTime = 0;
+const SHOT_COOLDOWN = 380;
+const ARCHERIE_ORIGIN_X = 200;
+const ARCHERIE_ORIGIN_Y = 325;
+let archeriePommes = [];
+let archerieStars = [];
+let lastArcheriePommeTime = 0;
+let nextArcheriePommeInterval = 1200;
+let lastArcherieStarTime = 0;
+let nextArcherieStarInterval = 2800;
+const ARCHERIE_POMME_SPEED = 2.2;
+let archeriePendingClick = null; // clic passé par processInput pour tirer (hors bouton retour)
+
 // Cooldown de l'épée
 let lastAttackTime = 0;
 const attackCooldown = 250  ; // Durée d'affichage de l'épée en millisecondes
@@ -164,13 +180,21 @@ function processInput() {
                         defensePommes = [];
                         defenseStars = [];
                     }
-                    if (item.label === "Archerie") gameState = "ARCHERIE";
+                    if (item.label === "Archerie") {
+                        gameState = "ARCHERIE";
+                        archeriePommes = [];
+                        archerieStars = [];
+                        arrows = [];
+                        archeriePendingClick = null;
+                    }
                 }
             });
             return;
         }
         if ((gameState === "COMBAT" || gameState === "DEFENSE" || gameState === "ARCHERIE") && isInside(pos, back)) {
             gameState = "CHOIX";
+        } else if (gameState === "ARCHERIE") {
+            archeriePendingClick = { x: click.clientX - rect.left, y: click.clientY - rect.top };
         }
     }
 
@@ -188,6 +212,7 @@ function processInput() {
     }
     canvas.style.cursor = hoveredItem ? "pointer" : "default";
 }
+
 
 function drawBackButton() {
     ctx.save();
@@ -430,17 +455,6 @@ function drawDefense() {
     ctx.restore();
 }
 
-function drawArcherie() {
-    ctx.drawImage(fond, 0, 0, canvas.width, canvas.height);
-    ctx.save();
-    drawPlayer();
-
-    updateStars();
-    updatepommes();
-    drawScoreAndCombo();
-    ctx.restore();
-}
-
 function drawPlayer() {
     // Défense : personnage au centre ; Combat et Archerie : même position (à gauche)
     if (gameState === "DEFENSE") {
@@ -639,6 +653,167 @@ function updatepommes() {
             pommes.splice(i, 1);
         }
     }
+}
+
+/** Spawn une pomme venant de la droite (mode Archerie uniquement). */
+function spawnArcheriePomme() {
+    const lane = Math.floor(Math.random() * 3);
+    const y = lane === 0 ? 280 : lane === 1 ? 350 : 420;
+    const vx = -(ARCHERIE_POMME_SPEED * (0.9 + Math.random() * 0.2) * difficulty);
+    const vy = (Math.random() - 0.5) * 0.5;
+    const p = new pomme(canvas.width + 30, y, 30, 30, vx, vy);
+    p.playerColorOnHit = "red";
+    archeriePommes.push(p);
+}
+
+/** Spawn une étoile (bonus) venant du haut ou de la droite, moins souvent (mode Archerie). */
+function spawnArcherieStar() {
+    const fromRight = Math.random() > 0.5;
+    let x, y, vx, vy;
+    if (fromRight) {
+        x = canvas.width + 25;
+        y = 80 + Math.random() * (canvas.height - 160);
+        vx = -1.5 * (0.8 + Math.random() * 0.4);
+        vy = (Math.random() - 0.5) * 0.8;
+    } else {
+        x = 80 + Math.random() * (canvas.width - 160);
+        y = -25;
+        vx = (Math.random() - 0.5) * 0.6;
+        vy = 1.5 * (0.8 + Math.random() * 0.4);
+    }
+    archerieStars.push({
+        x, y, width: 28, height: 28, vx, vy,
+        update() { this.x += this.vx; this.y += this.vy; }
+    });
+}
+
+/**
+ * Logique complète du mode Archerie : spawn pommes/étoiles, flèches, collisions.
+ * Touche uniquement archeriePommes, archerieStars, arrows, score, combo, difficulty.
+ */
+function updateArcherie() {
+    const now = Date.now();
+    if (now - lastArcheriePommeTime >= nextArcheriePommeInterval) {
+        spawnArcheriePomme();
+        lastArcheriePommeTime = now;
+        nextArcheriePommeInterval = Math.max(700, 1100 - difficulty * 80 + Math.random() * 300);
+    }
+    if (now - lastArcherieStarTime >= nextArcherieStarInterval) {
+        spawnArcherieStar();
+        lastArcherieStarTime = now;
+        nextArcherieStarInterval = 2400 + Math.random() * 800;
+    }
+
+    for (let i = archerieStars.length - 1; i >= 0; i--) {
+        const s = archerieStars[i];
+        s.update();
+        ctx.drawImage(star, s.x, s.y, s.width, s.height);
+        if (s.x + s.width < -30 || s.x > canvas.width + 30 || s.y + s.height < -30 || s.y > canvas.height + 30) {
+            archerieStars.splice(i, 1);
+        }
+    }
+
+    for (let i = archeriePommes.length - 1; i >= 0; i--) {
+        const p = archeriePommes[i];
+        p.update();
+        p.draw(ctx, pommeIMG);
+        const cx = p.x + p.largeur / 2;
+        const cy = p.y + p.hauteur / 2;
+        if (p.x + p.largeur < ARCHERIE_ORIGIN_X - 40) {
+            player.color = p.playerColorOnHit;
+            lastScore = score;
+            if (score > scores.ARCHERIE) {
+                scores.ARCHERIE = score;
+                localStorage.setItem("highscore_ARCHERIE", score);
+            }
+            difficulty = 1;
+            score = 0;
+            combo = 0;
+            archeriePommes.splice(i, 1);
+        } else if (p.x > canvas.width + 50 || p.x + p.largeur < -50 || p.y > canvas.height + 50 || p.y + p.hauteur < -50) {
+            archeriePommes.splice(i, 1);
+        }
+    }
+
+    for (let i = arrows.length - 1; i >= 0; i--) {
+        const a = arrows[i];
+        a.x += a.vx;
+        a.y += a.vy;
+        ctx.save();
+        ctx.translate(a.x, a.y);
+        ctx.rotate(a.angle);
+        ctx.fillStyle = "#ddd";
+        ctx.fillRect(0, -a.height / 2, a.width, a.height);
+        ctx.fillStyle = "#333";
+        ctx.beginPath();
+        ctx.moveTo(a.width, 0);
+        ctx.lineTo(a.width - 10, -5);
+        ctx.lineTo(a.width - 10, 5);
+        ctx.fill();
+        ctx.restore();
+        let hit = false;
+        for (let j = archeriePommes.length - 1; j >= 0 && !hit; j--) {
+            const p = archeriePommes[j];
+            const tipX = a.x + Math.cos(a.angle) * a.width;
+            const tipY = a.y + Math.sin(a.angle) * a.width;
+            if (circRectsOverlap(p.x, p.y, p.largeur, p.hauteur, tipX, tipY, 12)) {
+                archeriePommes.splice(j, 1);
+                score += 10;
+                combo += 1;
+                difficulty += DIFFICULTY_INCREASE;
+                hit = true;
+            }
+        }
+        for (let j = archerieStars.length - 1; j >= 0 && !hit; j--) {
+            const s = archerieStars[j];
+            const tipX = a.x + Math.cos(a.angle) * a.width;
+            const tipY = a.y + Math.sin(a.angle) * a.width;
+            const dist = Math.sqrt((tipX - (s.x + s.width/2)) ** 2 + (tipY - (s.y + s.height/2)) ** 2);
+            if (dist < 22) {
+                archerieStars.splice(j, 1);
+                score += 20;
+                combo += 2;
+                hit = true;
+            }
+        }
+        if (hit) arrows.splice(i, 1);
+        else if (a.x > canvas.width + 20 || a.x < -20 || a.y > canvas.height + 20 || a.y < -20) {
+            arrows.splice(i, 1);
+        }
+    }
+}
+
+/** Tire une flèche vers (targetX, targetY) en coordonnées canvas (mode Archerie). */
+function spawnArrow(targetX, targetY) {
+    const tx = targetX != null ? targetX : mousePosition.x;
+    const ty = targetY != null ? targetY : mousePosition.y;
+    const dx = tx - ARCHERIE_ORIGIN_X;
+    const dy = ty - ARCHERIE_ORIGIN_Y;
+    const angle = Math.atan2(dy, dx);
+    const arrow = {
+        x: ARCHERIE_ORIGIN_X,
+        y: ARCHERIE_ORIGIN_Y,
+        vx: Math.cos(angle) * ARROW_SPEED,
+        vy: Math.sin(angle) * ARROW_SPEED,
+        width: 32,
+        height: 4,
+        angle
+    };
+    arrows.push(arrow);
+}
+
+function drawArcherie() {
+    ctx.drawImage(fond, 0, 0, canvas.width, canvas.height);
+    ctx.save();
+    player.draw(ctx);
+    if (archeriePendingClick && Date.now() - lastShotTime >= SHOT_COOLDOWN) {
+        spawnArrow(archeriePendingClick.x, archeriePendingClick.y);
+        lastShotTime = Date.now();
+        archeriePendingClick = null;
+    }
+    updateArcherie();
+    drawScoreAndCombo();
+    ctx.restore();
 }
 
 
