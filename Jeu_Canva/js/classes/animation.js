@@ -14,7 +14,7 @@ class SlashAnimation {
         if (elapsed > this.duration) {
             this.isFinished = true;
         }
-        return elapsed / this.duration; // Retourne un pourcentage de progression (0-1)
+        return elapsed / this.duration;
     }
 
     draw(ctx, canvas) {
@@ -23,7 +23,7 @@ class SlashAnimation {
         if (this.isFinished) return;
 
         ctx.save();
-        ctx.globalAlpha = 1 - progress; // Fade out progressif
+        ctx.globalAlpha = 1 - progress; 
         ctx.strokeStyle = "rgba(255, 200, 0, 0.8)";
         ctx.lineWidth = 3;
         ctx.lineCap = "round";

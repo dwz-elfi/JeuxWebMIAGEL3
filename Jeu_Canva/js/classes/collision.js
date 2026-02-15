@@ -1,5 +1,3 @@
-
-
 //Collision entre un rectangle et un cercle
 function circRectsOverlap(x0, y0, w0, h0, cx, cy, r) {
    var testX=cx;

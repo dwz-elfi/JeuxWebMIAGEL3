@@ -12,7 +12,6 @@ let pendingClick = null;
 let mousePosition = { x: 0, y: 0 };
 
 function defineListeners() {
-    console.log("Définition des écouteurs d'événements");
     // Ecouteurs pour le clavier
     document.onkeydown = (event) => {
         console.log("Touche appuyée : " + event.key);
@@ -70,7 +69,6 @@ function initCanvasListeners(canvas) {
 
 /**
  * Récupère le dernier clic (coordonnées client) et le retire.
- * À appeler dans la game loop pour traiter le clic une seule fois.
  * @returns {{ clientX: number, clientY: number } | null}
  */
 function getAndConsumeClick() {
