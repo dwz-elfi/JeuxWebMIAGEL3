@@ -1,5 +1,5 @@
 import Player from "./player.js";
-import { defineListeners, inputStates } from "./ecouteurs_centralise.js";
+import { defineListeners, inputStates, initCanvasListeners, mousePosition } from "./ecouteurs_centralise.js";
 import { circRectsOverlap } from "./collision.js";
 import { SlashAnimation, SlashSound } from "./animation.js";
 import { pomme, Star } from "./entity.js";
@@ -71,7 +71,6 @@ let playBtn = {x:canvas.width/2-100, y:canvas.height/2-25, w:200, h:50};
 
 let hoveredItem = null;
 
-
 function drawMenu(){
     ctx.drawImage(imgMenu, 0, 0, canvas.width, canvas.height);
     ctx.save();
@@ -124,6 +123,26 @@ function drawChoix() {
 // Taille et position du bouton retour
 const backBtn = { x: 20, y: 20, w: 50, h: 40 };
 
+// Défense : centre du joueur et géométrie du bouclier (contrôlé par la souris)
+const DEFENSE_PLAYER_CX = 425;
+const DEFENSE_PLAYER_CY = 325;
+const SHIELD_RADIUS = 90;
+const SHIELD_HALF_ANGLE = (100 * Math.PI) / 180; // 100° d'ouverture en radians
+
+// Contexte passé aux écouteurs centralisés (clic, souris) — initialisé après choix et backBtn
+const gameContext = {
+    get canvas() { return canvas; },
+    getGameState: () => gameState,
+    setGameState: (s) => { gameState = s; },
+    playBtn,
+    choix,
+    backBtn,
+    isInside,
+    getHoveredItem: () => hoveredItem,
+    setHoveredItem: (item) => { hoveredItem = item; }
+};
+initCanvasListeners(gameContext);
+
 function drawBackButton() {
     ctx.save();
     ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
@@ -154,22 +173,72 @@ function drawCombat() {
     ctx.restore();
 }
 
+/** Retourne true si le point (px, py) est dans l’arc du bouclier (mode Défense). */
+function isPointInShieldArc(px, py) {
+    const dx = px - DEFENSE_PLAYER_CX;
+    const dy = py - DEFENSE_PLAYER_CY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > SHIELD_RADIUS + 20) return false;
+    const angle = Math.atan2(dy, dx);
+    const mouseAngle = Math.atan2(
+        mousePosition.y - DEFENSE_PLAYER_CY,
+        mousePosition.x - DEFENSE_PLAYER_CX
+    );
+    let diff = angle - mouseAngle;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    return Math.abs(diff) <= SHIELD_HALF_ANGLE;
+}
+
+function drawShield() {
+    const mouseAngle = Math.atan2(
+        mousePosition.y - DEFENSE_PLAYER_CY,
+        mousePosition.x - DEFENSE_PLAYER_CX
+    );
+    const startAngle = mouseAngle - SHIELD_HALF_ANGLE;
+    const endAngle = mouseAngle + SHIELD_HALF_ANGLE;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(DEFENSE_PLAYER_CX, DEFENSE_PLAYER_CY, SHIELD_RADIUS, startAngle, endAngle);
+    ctx.lineTo(DEFENSE_PLAYER_CX, DEFENSE_PLAYER_CY);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(100, 149, 237, 0.6)";
+    ctx.strokeStyle = "rgba(70, 100, 200, 0.9)";
+    ctx.lineWidth = 3;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+}
+
 function drawDefense() {
     ctx.drawImage(fond, 0, 0, canvas.width, canvas.height);
     ctx.save();
-    drawChoix();
+    drawPlayer();
+    drawShield();
+    updateStars();
+    updatepommes();
+    drawScoreAndCombo();
     ctx.restore();
 }
 
 function drawArcherie() {
     ctx.drawImage(fond, 0, 0, canvas.width, canvas.height);
     ctx.save();
-    drawChoix();
+    drawPlayer();
+
+    updateStars();
+    updatepommes();
+    drawScoreAndCombo();
     ctx.restore();
 }
 
 function drawPlayer() {
-    player.draw(ctx);
+    // Défense : personnage au centre ; Combat et Archerie : même position (à gauche)
+    if (gameState === "DEFENSE") {
+        player.draw2(ctx);
+    } else {
+        player.draw(ctx);
+    }
 }
 
 function drawScoreAndCombo() {
@@ -216,14 +285,16 @@ function updateStars() {
         // Dessiner l'étoile
         ctx.drawImage(star, s.x, s.y, s.width, s.height);
         
-        // Vérifier collision avec l'épée du côté gauche seulement
-        if (inputStates.left) {
-            if (circRectsOverlap(80, 360, 10, 70, s.x + s.width/2, s.y + s.height/2, 15)) {
-                // Augmenter le score et combo pour les étoiles
-                score += 20;
-                combo += 2;
-                stars.splice(i, 1);
-                continue;
+        // En mode Défense : les étoiles ne sont pas bloquées, elles doivent passer
+        if (gameState !== "DEFENSE") {
+            // Vérifier collision avec l'épée du côté gauche seulement (Combat / Archerie)
+            if (inputStates.left) {
+                if (circRectsOverlap(80, 360, 10, 70, s.x + s.width/2, s.y + s.height/2, 15)) {
+                    score += 20;
+                    combo += 2;
+                    stars.splice(i, 1);
+                    continue;
+                }
             }
         }
         
@@ -277,26 +348,48 @@ function updatepommes() {
     
     // Mettre à jour et dessiner les pommes
     for (let i = pommes.length - 1; i >= 0; i--) {
-        let p = pommes[i]; // On utilise 'p' pour éviter la confusion avec le tableau 'pommes'
-        p.update(); 
+        let p = pommes[i];
+        p.update();
         p.draw(ctx, pommeIMG);
 
-        // Vérifier collision avec l'épée selon le type de pomme
-        if (p.type === 0 && inputStates.right) { // Pomme du milieu
+        if (gameState === "DEFENSE") {
+            // Mode Défense : bouclier bloqué par la souris — bloquer les pommes, laisser passer les étoiles (géré dans updateStars)
+            const pommeCx = p.x + p.largeur / 2;
+            const pommeCy = p.y + p.hauteur / 2;
+            if (isPointInShieldArc(pommeCx, pommeCy)) {
+                pommes.splice(i, 1);
+                difficulty += DIFFICULTY_INCREASE;
+                score += 10;
+                combo += 1;
+                continue;
+            }
+            // Pomme a dépassé le joueur sans être bloquée = touché
+            if (p.x + p.largeur < DEFENSE_PLAYER_CX - 20) {
+                player.color = p.playerColorOnHit;
+                lastScore = score;
+                if (score > scores[gameState]) {
+                    scores[gameState] = score;
+                    localStorage.setItem("highscore_" + gameState, score);
+                }
+                difficulty = 1;
+                score = 0;
+                combo = 0;
+                pommes.splice(i, 1);
+            }
+            continue;
+        }
+
+        // Mode Combat / Archerie : collision avec l'épée selon le type de pomme
+        if (p.type === 0 && inputStates.right) {
             if (circRectsOverlap(250, 350, 55, 70, p.x + p.largeur/2+25 , p.y + p.hauteur/2, 15)) {
-                console.log("Pomme MID touchée! Difficulté: " + difficulty.toFixed(2));
                 pommes.splice(i, 1);
-                // Augmenter la difficulté, score et combo
                 difficulty += DIFFICULTY_INCREASE;
                 score += 10;
                 combo += 1;
-                
                 continue;
             }
-        } 
-        else if (p.type === 1 && inputStates.up) { // Pomme du haut
+        } else if (p.type === 1 && inputStates.up) {
             if (circRectsOverlap(110, 250, 20, 70, p.x + p.largeur/2, p.y + p.hauteur/2 + 500, 500)) {
-                console.log("Pomme Haut touchée! Difficulté: " + difficulty.toFixed(2));
                 pommes.splice(i, 1);
                 // Augmenter la difficulté, score et combo
                 difficulty += DIFFICULTY_INCREASE;
@@ -304,8 +397,7 @@ function updatepommes() {
                 combo += 1;
                 continue;
             }
-        } 
-        else if (p.type === 2 && inputStates.down) { // Pomme du bas
+        } else if (p.type === 2 && inputStates.down) {
             if (circRectsOverlap(250, 440, 20, 70, p.x + p.largeur/2 + 500, p.y + p.hauteur/2, 500)) {
                 pommes.splice(i, 1);
                 console.log("Pomme Bas touchée! Difficulté: " + difficulty.toFixed(2));
@@ -341,71 +433,6 @@ function updatepommes() {
 }
 
 
-canvas.addEventListener("click", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const pos = { x: e.clientX - rect.left-13, y: e.clientY - rect.top+14 };
-    const pos2 = { x: e.clientX - rect.left-50, y: e.clientY+2 - rect.top };
-    const back = {x: 10, y: 35, w: 45, h: 35 }
-    if (gameState === "MENU" && isInside(pos, playBtn)) {
-        console.log("bouton play cliqué");
-        gameState = "CHOIX";
-        return;
-    }
-    if (gameState === "CHOIX" ) {
-        choix.forEach(item => {
-            if (isInside(pos2, item)) {
-                console.log("Choix : " + item.label);
-                if (item.label === "Combat") {
-                    gameState = "COMBAT";
-                }
-                if (item.label === "Defense") {
-                    gameState = "DEFENSE";
-                }
-                if (item.label === "Archerie") {
-                    gameState = "ARCHERIE";
-                }
-            }
-        });
-        return;
-    }
-    if ((gameState === "COMBAT" || gameState === "DEFENSE" || gameState === "ARCHERIE") && isInside(pos, back)) {
-        console.log("Retour au choix");
-        gameState = "CHOIX";
-    }
-    if(hoveredItem) {
-        canvas.style.cursor = "pointer";
-    } else {
-        canvas.style.cursor = "default";
-    }
-});
-
-
-canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const pos = { x: e.clientX - rect.left-13, y: e.clientY - rect.top+14 };
-    const pos2 = { x: e.clientX - rect.left-50, y: e.clientY+2 - rect.top };
-    const backBtnHover = {x: 10, y: 35, w: 45, h: 35 }
-    hoveredItem = null;
-    if (gameState === 'MENU' && isInside(pos, playBtn)) {
-        hoveredItem = pos;
-    }
-    if (gameState === 'CHOIX'){
-        choix.forEach(item => { 
-            if(isInside(pos2, item)) {
-                hoveredItem = item; 
-            }
-        });
-    }
-    else if ((gameState === "COMBAT" || gameState === "DEFENSE" || gameState === "ARCHERIE") && isInside(pos, backBtnHover)) {
-        hoveredItem = backBtn;
-    }
-    if(hoveredItem) {
-        canvas.style.cursor = "pointer";
-    } else {
-        canvas.style.cursor = "default";
-    }
-});
-
 function attaqueJoueur() {
     let now = Date.now();
     
@@ -425,7 +452,7 @@ function attaqueJoueur() {
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 35, 350, 100, 90);
-        ctx.fillStyle = "red";
+        //ctx.fillStyle = "red";
         ctx.fillRect(80, 360, 10, 70);
         ctx.restore();
         attackExecuted = true;
@@ -439,7 +466,7 @@ function attaqueJoueur() {
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 75, 488, 100, 85);
-        ctx.fillStyle = "red";
+        //ctx.fillStyle = "red";
         ctx.fillRect(120, 495, 10, 70);
         ctx.restore();
         attackExecuted = true;
@@ -453,7 +480,7 @@ function attaqueJoueur() {
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 65, 510, 100, 85);
-        ctx.fillStyle = "red";
+        //ctx.fillStyle = "red";
         ctx.fillRect(110, 515, 10, 70);
         ctx.restore();
         attackExecuted = true;
@@ -467,7 +494,7 @@ function attaqueJoueur() {
         ctx.translate(-105, -395); // Revenir à la position d'origine
         
         ctx.drawImage(epee, 85, 490, 100, 85);
-        ctx.fillStyle = "red";
+        //ctx.fillStyle = "red";
         ctx.fillRect(130, 495, 10, 70);
         ctx.restore();
         attackExecuted = true;

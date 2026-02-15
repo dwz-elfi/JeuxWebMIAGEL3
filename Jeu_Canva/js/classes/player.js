@@ -34,4 +34,14 @@ export default class Player extends ObjetGraphique {
 
         ctx.restore();
     }
+    //Dessin pour le jeu de défense, le personnage se trouve au millieu et non sur la gauche
+    draw2(ctx){
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.largeur / 2.5, 0, 2 * Math.PI);
+        ctx.roundRect(this.x-25, this.y+25, this.largeur, this.largeur*1.5,this.largeur / 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.restore();
+    }
 }    
